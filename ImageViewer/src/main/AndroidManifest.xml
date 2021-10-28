@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.android.imageviewer">
+
+    <application>
+        <activity android:name=".ImageViewerUi"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/Transparent"
+            />
+
+        <activity android:name=".ImageViewerUi2"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/Transparent"
+            />
+    </application>
+
+</manifest>

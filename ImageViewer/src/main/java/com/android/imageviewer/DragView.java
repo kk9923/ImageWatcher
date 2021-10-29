@@ -16,6 +16,7 @@ import android.widget.ImageView;
 
 import androidx.annotation.Keep;
 
+import com.android.imageviewer.utils.Utils;
 import com.github.chrisbanes.photoview.PhotoView;
 
 import me.panpf.sketch.decode.ImageSizeCalculator;
@@ -39,10 +40,17 @@ public class DragView extends FrameLayout {
     private final long DEFAULT_DURATION = 300;
     long animationDuration = DEFAULT_DURATION;
 
+    //  动画开始前位置信息
     private int mOriginLeft;
     private int mOriginTop;
     private int mOriginHeight;
     private int mOriginWidth;
+
+    //  动画结束后位置信息
+    private int imageLeftOfAnimatorEnd;
+    private int imageTopOfAnimatorEnd;
+    private int imageWidthOfAnimatorEnd;
+    private int imageHeightOfAnimatorEnd;
 
     private final int screenWidth;
     private final int screenHeight;
@@ -69,11 +77,6 @@ public class DragView extends FrameLayout {
     int realWidth;
     int realHeight;
     int touchSlop = ViewConfiguration.getTouchSlop();
-
-    int imageLeftOfAnimatorEnd = 0;
-    int imageTopOfAnimatorEnd = 0;
-    int imageWidthOfAnimatorEnd = 0;
-    int imageHeightOfAnimatorEnd = 0;
 
     boolean isMulitFinger = false;
     boolean isDrag = false;
@@ -109,19 +112,17 @@ public class DragView extends FrameLayout {
         int x = (int) event.getX();
         int y = (int) event.getY();
         View view = getContentView();
-        if (view instanceof ImageView) {
-            ImageView sketchImageView = (ImageView) view;
+        if (view instanceof PhotoView) {
+            PhotoView photoView = (PhotoView) view;
             //如果是长图  没有缩放到最小,则不给事件
-//            if (sketchImageView.getZoomer() != null) {
-//                if (isLongHeightImage || isLongWidthImage) {
-//                    if (sketchImageView.getZoomer().getZoomScale() > sketchImageView.getZoomer().getMinZoomScale()) {
-//                        return super.dispatchTouchEvent(event);
-//                    }
-//                } else if ((Math.round(sketchImageView.getZoomer().getSupportZoomScale() * 1000) / 1000f) > 1) {
-//                    //如果对图片进行缩放或者缩小操作 则不给事件
-//                    return super.dispatchTouchEvent(event);
-//                }
-//            }
+            if (isLongHeightImage || isLongWidthImage) {
+                if (photoView.getScale() > photoView.getMinimumScale()) {
+                    return super.dispatchTouchEvent(event);
+                }
+            } else if ((Math.round(photoView.getScale() * 1000) / 1000f) > 1) {
+                //如果对图片进行缩放或者缩小操作 则不给事件
+                return super.dispatchTouchEvent(event);
+            }
         }
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_POINTER_DOWN:
@@ -195,38 +196,15 @@ public class DragView extends FrameLayout {
                 mCurrentTop += 1.1 * dy;
                 mCurrentLeft += dx;
 
-                int newWidth;
-                int newHeight;
-                ImageSizeCalculator sizeCalculator = new ImageSizeCalculator();
-                if (sizeCalculator.canUseReadModeByHeight(realWidth, realHeight) ||
-                        sizeCalculator.canUseReadModeByWidth(realWidth, realHeight) ||
-                        screenWidth / (float) screenHeight < realWidth / (float) realHeight) {
-                    isLongHeightImage = sizeCalculator.canUseReadModeByHeight(realWidth, realHeight) && getContentView() instanceof ImageView;
-                    isLongWidthImage = sizeCalculator.canUseReadModeByWidth(realWidth, realHeight) && getContentView() instanceof ImageView;
-                    newWidth = screenWidth;
-                    newHeight = (int) (newWidth * (realHeight / (float) realWidth));
-                    if (newHeight >= screenHeight || sizeCalculator.canUseReadModeByWidth(realWidth, realHeight)) {
-                        newHeight = screenHeight;
-                    }
-                } else {
-                    newHeight = screenHeight;
-                    newWidth = (int) (newHeight * (realWidth / (float) realHeight));
-                }
+                int width = (int) (imageWidthOfAnimatorEnd * (1 - alphaChangePercent));
+                int height = (int) (imageHeightOfAnimatorEnd * (1 - alphaChangePercent));
+                int left = mCurrentLeft;
+                int top = mCurrentTop;
 
-                final int endLeft = (screenWidth - newWidth) / 2;
-                final int endHeight = newHeight;
-                final int endWidth = newWidth;
+                setContentLayoutLayoutParams(left, top, width, height);
 
-
-                FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                layoutParams.width = (int) (endWidth * (1 - alphaChangePercent));
-                layoutParams.height = (int) (endHeight * (1 - alphaChangePercent));
-                layoutParams.leftMargin = mCurrentLeft;
-                layoutParams.topMargin = mCurrentTop;
-                contentLayout.setLayoutParams(layoutParams);
-
-                mCurrentWidth = layoutParams.width;
-                mCurrentHeight = layoutParams.height;
+                mCurrentWidth = width;
+                mCurrentHeight = height;
 
                 backgroundView.setAlpha(mAlpha);
                 mLastX = moveX;
@@ -256,7 +234,7 @@ public class DragView extends FrameLayout {
                 if (mTranslateY > MAX_TRANSLATE_Y) {
                     onBackPress();
                 } else {
-                    backToNormal();
+                    moveToNormal();
                 }
                 isDrag = false;
                 mYDistanceTraveled = 0;
@@ -323,22 +301,41 @@ public class DragView extends FrameLayout {
         contentLayout.addView(view);
     }
 
+
     public void show(boolean showAnimation) {
         setVisibility(View.VISIBLE);
         mAlpha = showAnimation ? 0 : 1;
 
 //        mOriginTop = mOriginTop + Utils.calcStatusBarHeight(getContext());
-        FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-        layoutParams.width = mOriginWidth;
-        layoutParams.height = mOriginHeight;
-        layoutParams.leftMargin = mOriginLeft;
-        layoutParams.topMargin = mOriginTop;
-        contentLayout.setLayoutParams(layoutParams);
+
+        setContentLayoutLayoutParams(mOriginLeft, mOriginTop, mOriginWidth, mOriginHeight);
 
         if (showAnimation)
             changeBackgroundViewAlpha(0, 1, false);
 
+        calculateEndSize();
 
+        if (!showAnimation) {
+            changeImageViewToFitCenter();
+
+            mCurrentLeft = imageLeftOfAnimatorEnd;
+            mCurrentTop = (screenHeight - imageHeightOfAnimatorEnd) / 2;
+            mCurrentWidth = imageWidthOfAnimatorEnd;
+            mCurrentHeight = imageHeightOfAnimatorEnd;
+
+            setContentLayoutLayoutParams(0, 0, screenWidth, screenHeight);
+            return;
+        }
+        int mOriginCenterX = mOriginLeft + mOriginWidth / 2;
+        int mOriginCenterY = mOriginTop + mOriginHeight / 2;
+        int mEndCenterX = imageLeftOfAnimatorEnd + imageWidthOfAnimatorEnd / 2;
+        int mEndCenterY = (screenHeight) / 2;
+
+        doAnimation(mOriginLeft, imageLeftOfAnimatorEnd, mOriginTop, imageTopOfAnimatorEnd, mOriginWidth, imageWidthOfAnimatorEnd, mOriginHeight, imageHeightOfAnimatorEnd, false);
+        getLocation(mOriginWidth, mOriginHeight, showAnimation);
+    }
+
+    private void calculateEndSize() {
         int newWidth;
         int newHeight;
         ImageSizeCalculator sizeCalculator = new ImageSizeCalculator();
@@ -357,125 +354,10 @@ public class DragView extends FrameLayout {
             newHeight = screenHeight;
             newWidth = (int) (newHeight * (realWidth / (float) realHeight));
         }
-
-        final int endLeft = (screenWidth - newWidth) / 2;
-        final int endHeight = newHeight;
-        final int endWidth = newWidth;
-        if (!showAnimation) {
-            changeImageViewToFitCenter();
-            layoutParams.width = screenWidth;
-            layoutParams.height = screenHeight;
-            layoutParams.leftMargin = 0;
-            layoutParams.topMargin = 0;
-
-            mCurrentLeft = endLeft;
-            mCurrentTop = (screenHeight - endHeight) / 2;
-            mCurrentWidth = endWidth;
-            mCurrentHeight = endHeight;
-            contentLayout.setLayoutParams(layoutParams);
-            return;
-        }
-        if (mOriginLeft != endLeft) {
-            ValueAnimator valueAnimator = ValueAnimator.ofFloat(mOriginLeft, endLeft);
-            valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                @Override
-                public void onAnimationUpdate(ValueAnimator animation) {
-                    float value = (float) animation.getAnimatedValue();
-
-                    float percent = (mOriginLeft - value) / (mOriginLeft - endLeft);
-
-                    float leftMargin = value;
-                    float topMargin = ((screenHeight - endHeight) / 2f - mOriginTop) * percent + mOriginTop;
-                    float width = percent * (endWidth - mOriginWidth) + mOriginWidth;
-                    float height = percent * (endHeight - mOriginHeight) + mOriginHeight;
-
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = (int) width;
-                    layoutParams.height = (int) height;
-                    layoutParams.leftMargin = (int) leftMargin;
-                    layoutParams.topMargin = (int) topMargin;
-                    contentLayout.setLayoutParams(layoutParams);
-
-                }
-            });
-            valueAnimator.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    super.onAnimationStart(animation);
-                    isAnimating = true;
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    isAnimating = false;
-
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = (int) screenWidth;
-                    layoutParams.height = (int) screenHeight;
-                    layoutParams.leftMargin = 0;
-                    layoutParams.topMargin = 0;
-
-                    mCurrentLeft = endLeft;
-                    mCurrentTop = (screenHeight - endHeight) / 2;
-                    mCurrentWidth = endWidth;
-                    mCurrentHeight = endHeight;
-                    contentLayout.setLayoutParams(layoutParams);
-                    changeImageViewToFitCenter();
-                }
-            });
-            valueAnimator.setDuration(animationDuration).start();
-        } else {
-            int endTop = (screenHeight - endHeight) / 2;
-            ValueAnimator valueAnimator = ValueAnimator.ofFloat(mOriginTop, endTop);
-            valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                @Override
-                public void onAnimationUpdate(ValueAnimator animation) {
-                    float value = (float) animation.getAnimatedValue();
-
-                    float topPercent = (mOriginTop - value) / (mOriginTop - endTop);
-
-                    float leftMargin = mOriginLeft;
-                    float topMargin = value;
-                    float width = topPercent * (endWidth - mOriginWidth) + mOriginWidth;
-                    float height = topPercent * (endHeight - mOriginHeight) + mOriginHeight;
-
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = (int) width;
-                    layoutParams.height = (int) height;
-                    layoutParams.leftMargin = (int) leftMargin;
-                    layoutParams.topMargin = (int) topMargin;
-                    contentLayout.setLayoutParams(layoutParams);
-
-                }
-            });
-            valueAnimator.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    super.onAnimationStart(animation);
-                    isAnimating = true;
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    isAnimating = false;
-                    changeImageViewToFitCenter();
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = (int) screenWidth;
-                    layoutParams.height = (int) screenHeight;
-                    layoutParams.leftMargin = 0;
-                    layoutParams.topMargin = 0;
-
-                    mCurrentLeft = endLeft;
-                    mCurrentTop = (screenHeight - endHeight) / 2;
-                    mCurrentWidth = endWidth;
-                    mCurrentHeight = endHeight;
-                    contentLayout.setLayoutParams(layoutParams);
-                }
-            });
-            valueAnimator.setDuration(animationDuration).start();
-        }
-
-        getLocation(mOriginWidth, mOriginHeight, showAnimation);
+        imageLeftOfAnimatorEnd = (screenWidth - newWidth) / 2;
+        imageTopOfAnimatorEnd = (screenHeight - newHeight) / 2;
+        imageWidthOfAnimatorEnd = newWidth;
+        imageHeightOfAnimatorEnd = newHeight;
     }
 
     private void getLocation(float minViewWidth, float minViewHeight, final boolean showImmediately) {
@@ -483,6 +365,17 @@ public class DragView extends FrameLayout {
         contentLayout.getLocationOnScreen(locationImage);
         float targetSize;
         targetImageWidth = screenWidth;
+    }
+
+    private void setContentLayoutLayoutParams(int left, int top, int width, int height) {
+        if (contentLayout != null) {
+            FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
+            layoutParams.leftMargin = left;
+            layoutParams.topMargin = top;
+            layoutParams.width = width;
+            layoutParams.height = height;
+            contentLayout.setLayoutParams(layoutParams);
+        }
     }
 
     public void putData(int left, int top, int originWidth, int originHeight, int realWidth, int realHeight) {
@@ -507,225 +400,75 @@ public class DragView extends FrameLayout {
         }
     }
 
-    public void backToNormal() {
-        int newWidth;
-        int newHeight;
-        ImageSizeCalculator sizeCalculator = new ImageSizeCalculator();
-        if (sizeCalculator.canUseReadModeByHeight(realWidth, realHeight) ||
-                sizeCalculator.canUseReadModeByWidth(realWidth, realHeight) ||
-                screenWidth / (float) screenHeight < realWidth / (float) realHeight) {
-            isLongHeightImage = sizeCalculator.canUseReadModeByHeight(realWidth, realHeight) && getContentView() instanceof ImageView;
-            isLongWidthImage = sizeCalculator.canUseReadModeByWidth(realWidth, realHeight) && getContentView() instanceof ImageView;
-            newWidth = screenWidth;
-            newHeight = (int) (newWidth * (realHeight / (float) realWidth));
-            if (newHeight >= screenHeight || sizeCalculator.canUseReadModeByWidth(realWidth, realHeight)) {
-                newHeight = screenHeight;
-            }
-        } else {
-            newHeight = screenHeight;
-            newWidth = (int) (newHeight * (realWidth / (float) realHeight));
-        }
-
-        final int endLeft = (screenWidth - newWidth) / 2;
-        final int endHeight = newHeight;
-        final int endWidth = newWidth;
-
-        if (endLeft != mCurrentLeft) {
-            ValueAnimator valueAnimator = ValueAnimator.ofFloat(mCurrentLeft, endLeft);
-            valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                @Override
-                public void onAnimationUpdate(ValueAnimator animation) {
-                    float value = (float) animation.getAnimatedValue();
-
-                    float percent = (mCurrentLeft - value) / (mCurrentLeft - endLeft);
-                    float leftMargin = value;
-//                float topMargin = (screenHeight - mCurrentHeight) / 2f - ((screenHeight - mCurrentHeight) / 2f - mOriginTop) * percent;
-                    float topMargin = mCurrentTop - percent * (mCurrentTop - (screenHeight - endHeight) / 2f);
-                    float width = mCurrentWidth + percent * (endWidth - mCurrentWidth);
-                    float height = mCurrentHeight + percent * (endHeight - mCurrentHeight);
-
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = (int) width;
-                    layoutParams.height = (int) height;
-                    layoutParams.leftMargin = (int) leftMargin;
-                    layoutParams.topMargin = (int) topMargin;
-                    contentLayout.setLayoutParams(layoutParams);
-
-                }
-            });
-            valueAnimator.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    super.onAnimationStart(animation);
-                    isAnimating = true;
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    isAnimating = false;
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = (int) screenWidth;
-                    layoutParams.height = (int) screenHeight;
-                    layoutParams.leftMargin = 0;
-                    layoutParams.topMargin = 0;
-
-                    mCurrentLeft = endLeft;
-                    mCurrentTop = (screenHeight - endHeight) / 2;
-                    mCurrentWidth = endWidth;
-                    mCurrentHeight = endHeight;
-                    contentLayout.setLayoutParams(layoutParams);
-
-
-                }
-            });
-            valueAnimator.setDuration(animationDuration).start();
-        } else {
-            int endTop = (screenHeight - endHeight) / 2;
-            ValueAnimator valueAnimator = ValueAnimator.ofFloat(mCurrentTop, endTop);
-            valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                @Override
-                public void onAnimationUpdate(ValueAnimator animation) {
-                    float value = (float) animation.getAnimatedValue();
-
-                    float percent = (mCurrentLeft - value) / (mCurrentTop - endTop);
-                    float leftMargin = mCurrentLeft;
-//                float topMargin = (screenHeight - mCurrentHeight) / 2f - ((screenHeight - mCurrentHeight) / 2f - mOriginTop) * percent;
-                    float topMargin = value;
-                    float width = mCurrentWidth + percent * (endWidth - mCurrentWidth);
-                    float height = mCurrentHeight + percent * (endHeight - mCurrentHeight);
-
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = (int) width;
-                    layoutParams.height = (int) height;
-                    layoutParams.leftMargin = (int) leftMargin;
-                    layoutParams.topMargin = (int) topMargin;
-                    contentLayout.setLayoutParams(layoutParams);
-
-                }
-            });
-            valueAnimator.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    super.onAnimationStart(animation);
-                    isAnimating = true;
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    isAnimating = false;
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = (int) screenWidth;
-                    layoutParams.height = (int) screenHeight;
-                    layoutParams.leftMargin = 0;
-                    layoutParams.topMargin = 0;
-
-                    mCurrentLeft = endLeft;
-                    mCurrentTop = (screenHeight - endHeight) / 2;
-                    mCurrentWidth = endWidth;
-                    mCurrentHeight = endHeight;
-                    contentLayout.setLayoutParams(layoutParams);
-
-
-                }
-            });
-            valueAnimator.setDuration(animationDuration).start();
-        }
+    /**
+     * 拖拽时, Y轴拖拽距离小于 MAX_TRANSLATE_Y , 回到屏幕中间
+     */
+    public void moveToNormal() {
+        doAnimation(mCurrentLeft, imageLeftOfAnimatorEnd, mCurrentTop, imageTopOfAnimatorEnd, mCurrentWidth, imageWidthOfAnimatorEnd, mCurrentHeight, imageHeightOfAnimatorEnd, false);
         changeBackgroundViewAlpha(mAlpha, 1, false);
     }
 
+    /**
+     * 关闭动画  从当前位置 动画至初始位置
+     */
     public void onBackPress() {
-        if (mCurrentLeft != mOriginLeft) {
-            ValueAnimator valueAnimator = ValueAnimator.ofFloat(mCurrentLeft, mOriginLeft);
-            valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                @Override
-                public void onAnimationUpdate(ValueAnimator animation) {
-                    float value = (float) animation.getAnimatedValue();
-
-                    float percent = (mCurrentLeft - value) / (mCurrentLeft - mOriginLeft);
-                    float leftMargin = value;
-//                float topMargin = (screenHeight - mCurrentHeight) / 2f - ((screenHeight - mCurrentHeight) / 2f - mOriginTop) * percent;
-                    float topMargin = mCurrentTop - percent * (mCurrentTop - mOriginTop);
-                    float width = mCurrentWidth - percent * (mCurrentWidth - mOriginWidth);
-                    float height = mCurrentHeight - percent * (mCurrentHeight - mOriginHeight);
-
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = (int) width;
-                    layoutParams.height = (int) height;
-                    layoutParams.leftMargin = (int) leftMargin;
-                    layoutParams.topMargin = (int) topMargin;
-                    contentLayout.setLayoutParams(layoutParams);
-
-                }
-            });
-            valueAnimator.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    super.onAnimationStart(animation);
-                    changeImageViewToCenterCrop();
-                    isAnimating = true;
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    isAnimating = false;
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = mOriginWidth;
-                    layoutParams.height = mOriginHeight;
-                    layoutParams.leftMargin = mOriginLeft;
-                    layoutParams.topMargin = mOriginTop;
-                    contentLayout.setLayoutParams(layoutParams);
-
-
-                }
-            });
-            valueAnimator.setDuration(animationDuration).start();
-        } else {
-            ValueAnimator valueAnimator = ValueAnimator.ofFloat(mCurrentTop, mOriginTop);
-            valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                @Override
-                public void onAnimationUpdate(ValueAnimator animation) {
-                    float value = (float) animation.getAnimatedValue();
-
-                    float percent = (mCurrentTop - value) / (mCurrentTop - mOriginTop);
-                    float leftMargin = mOriginLeft;
-//                float topMargin = (screenHeight - mCurrentHeight) / 2f - ((screenHeight - mCurrentHeight) / 2f - mOriginTop) * percent;
-                    float topMargin = value;
-                    float width = mCurrentWidth - percent * (mCurrentWidth - mOriginWidth);
-                    float height = mCurrentHeight - percent * (mCurrentHeight - mOriginHeight);
-
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = (int) width;
-                    layoutParams.height = (int) height;
-                    layoutParams.leftMargin = (int) leftMargin;
-                    layoutParams.topMargin = (int) topMargin;
-                    contentLayout.setLayoutParams(layoutParams);
-
-                }
-            });
-            valueAnimator.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    super.onAnimationStart(animation);
-                    changeImageViewToCenterCrop();
-                    isAnimating = true;
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    isAnimating = false;
-                    FrameLayout.LayoutParams layoutParams = (LayoutParams) contentLayout.getLayoutParams();
-                    layoutParams.width = mOriginWidth;
-                    layoutParams.height = mOriginHeight;
-                    layoutParams.leftMargin = mOriginLeft;
-                    layoutParams.topMargin = mOriginTop;
-                    contentLayout.setLayoutParams(layoutParams);
-
-
-                }
-            });
-            valueAnimator.setDuration(animationDuration).start();
-        }
+        doAnimation(mCurrentLeft, mOriginLeft, mCurrentTop, mOriginTop, mCurrentWidth, mOriginWidth, mCurrentHeight, mOriginHeight, true);
         changeBackgroundViewAlpha(mAlpha, 0, true);
+    }
+
+    private void doAnimation(float startLeft, float endLeft, float startTop, float endTop,
+                             float startWidth, float endWidth, float startHeight, float endHeight, boolean isOnBackPress) {
+        ValueAnimator valueAnimator;
+        if (startLeft != endLeft) {
+            valueAnimator = ValueAnimator.ofFloat(startLeft, endLeft);
+        } else {
+            valueAnimator = ValueAnimator.ofFloat(startTop, endTop);
+        }
+        valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                float value = (float) animation.getAnimatedValue();
+
+                float percent;
+                if (startLeft != endLeft) {
+                    percent = (startLeft - value) / (startLeft - endLeft);
+                } else {
+                    percent = (startTop - value) / (startTop - endTop);
+                }
+                int leftMargin = (int) (startLeft + percent * (endLeft - startLeft));
+                int topMargin = (int) (startTop + percent * (endTop - startTop));
+                int width = (int) (startWidth + percent * (endWidth - startWidth));
+                int height = (int) (startHeight + percent * (endHeight - startHeight));
+                setContentLayoutLayoutParams(leftMargin, topMargin, width, height);
+            }
+        });
+        valueAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+                super.onAnimationStart(animation);
+                if (isOnBackPress) {
+                    changeImageViewToCenterCrop();
+                }
+                isAnimating = true;
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                isAnimating = false;
+
+                if (isOnBackPress) {
+                    setContentLayoutLayoutParams((int) endLeft, (int) endTop, (int) endWidth, (int) endHeight);
+                } else {
+                    changeImageViewToFitCenter();
+                    mCurrentLeft = imageLeftOfAnimatorEnd;
+                    mCurrentTop = (screenHeight - imageHeightOfAnimatorEnd) / 2;
+                    mCurrentWidth = imageWidthOfAnimatorEnd;
+                    mCurrentHeight = imageHeightOfAnimatorEnd;
+                    setContentLayoutLayoutParams(0, 0, screenWidth, screenHeight);
+                }
+            }
+        });
+        valueAnimator.setDuration(animationDuration).start();
     }
 
     /**

@@ -7,6 +7,7 @@ import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.graphics.Rect;
 import android.text.SpannableStringBuilder;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -39,6 +40,7 @@ import com.kcrason.highperformancefriendscircle.beans.UserBean;
 import com.kcrason.highperformancefriendscircle.widgets.VerticalCommentWidget;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import ch.ielse.view.imagewatcher.ImageWatcher;
@@ -128,8 +130,14 @@ public class FriendCircleAdapter extends RecyclerView.Adapter<FriendCircleAdapte
                 wordAndImagesViewHolder.nineGridView.setOnImageClickListener(new NineGridView.OnImageClickListener() {
                     @Override
                     public void onImageClick(int position, View view) {
+                        Rect globalVisibleRect = new  Rect();
+                        view.getGlobalVisibleRect(globalVisibleRect);
+                        System.out.println("  globalVisibleRect   " + globalVisibleRect);
 //                        mImageWatcher.show((ImageView) view, wordAndImagesViewHolder.nineGridView.getImageViews(), friendCircleBean.getImageUrls());
                         int location[] = new int[2];
+
+                        view.getLocationOnScreen(location);
+                        System.out.println(" getLocationOnScreen  " + Arrays.toString(location));
                         ArrayList<ContentViewOriginModel> originModels = new ArrayList<ContentViewOriginModel>();
                         for (int i = 0; i < wordAndImagesViewHolder.nineGridView.getImageViews().size(); i++) {
                             ContentViewOriginModel imageBean = new ContentViewOriginModel();

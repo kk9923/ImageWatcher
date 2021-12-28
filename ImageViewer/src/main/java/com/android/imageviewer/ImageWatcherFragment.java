@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 
 import com.android.imageviewer.loading.LoadingView;
@@ -76,6 +77,7 @@ public class ImageWatcherFragment extends Fragment {
             public void callFinish() {
                 FragmentActivity activity = getActivity();
                 if (activity != null && !activity.isFinishing() && !activity.isDestroyed()) {
+                    activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
                     activity.finish();
                     activity.overridePendingTransition(0, 0);
                 }

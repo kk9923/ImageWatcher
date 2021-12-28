@@ -54,25 +54,11 @@ public class ImageViewerUi2 extends AppCompatActivity {
 
     //    private IIndicator iIndicator;
 
-    private ViewPager mViewPager;
+    private ViewPagerFixed mViewPager;
 
     private List<ImageWatcherFragment> fragmentList;
 
     public static void show(Context context, View sharedElement, ArrayList<String> imageList, int position, ArrayList<ContentViewOriginModel> originModels) {
-//        Window window = Fucking.getWindow(context);
-//        boolean isFullScreen = false;
-//        if ((window.getAttributes().flags & WindowManager.LayoutParams.FLAG_FULLSCREEN)
-//                == WindowManager.LayoutParams.FLAG_FULLSCREEN) {
-//            isFullScreen = true;
-//        }
-//        if (!isFullScreen) {
-//            window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-//                window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-//                window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-//                window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-//            }
-//        }
 
         Intent intent = new Intent(context, ImageViewerUi2.class);
         intent.putExtra(IMAGE_LIST, imageList);
@@ -86,31 +72,9 @@ public class ImageViewerUi2 extends AppCompatActivity {
     private ArrayList<ContentViewOriginModel> originModels;
     private int initPosition;
 
-    public static void fullScreen(Activity activity) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                //5.x开始需要把颜色设置透明，否则导航栏会呈现系统默认的浅灰色
-                Window window = activity.getWindow();
-                View decorView = window.getDecorView();
-                //两个 flag 要结合使用，表示让应用的主体内容占用系统状态栏的空间
-                int option = View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
-                decorView.setSystemUiVisibility(option);
-                window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-                window.setStatusBarColor(Color.TRANSPARENT);
-            } else {
-                Window window = activity.getWindow();
-                WindowManager.LayoutParams attributes = window.getAttributes();
-                int flagTranslucentStatus = WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS;
-                int flagTranslucentNavigation = WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION;
-                attributes.flags |= flagTranslucentStatus;
-                window.setAttributes(attributes);
-            }
-        }
-    }
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+//        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         super.onCreate(savedInstanceState);
 //        ImmersionBar.with(this).hideBar(BarHide.FLAG_HIDE_STATUS_BAR).init();
         if (ImmersionBar.hasNavigationBar(this)) {

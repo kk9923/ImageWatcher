@@ -10,7 +10,15 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <include layout="@layout/include_title_bar_view"/>
+        <LinearLayout
+            android:background="@color/black"
+            android:id="@+id/title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <include layout="@layout/include_title_bar_view"/>
+
+        </LinearLayout>
 
 
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout

@@ -3,11 +3,9 @@ package com.kcrason.highperformancefriendscircle.adapters;
 import android.app.Activity;
 import android.content.Context;
 
-import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.graphics.Rect;
 import android.text.SpannableStringBuilder;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -17,10 +15,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.android.imageviewer.ContentViewOriginModel;
-import com.android.imageviewer.ImageViewerUi;
-import com.android.imageviewer.ImageViewerUi2;
-import com.android.imageviewer.utils.Fucking;
+import com.android.imagewatcher.ImageWatcher;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
 import com.bumptech.glide.request.RequestOptions;
@@ -40,10 +35,7 @@ import com.kcrason.highperformancefriendscircle.beans.UserBean;
 import com.kcrason.highperformancefriendscircle.widgets.VerticalCommentWidget;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-
-import ch.ielse.view.imagewatcher.ImageWatcher;
 
 /**
  * @author KCrason
@@ -72,9 +64,9 @@ public class FriendCircleAdapter extends RecyclerView.Adapter<FriendCircleAdapte
 
     private RecyclerView mRecyclerView;
 
-    private ImageWatcher mImageWatcher;
+    private ch.ielse.view.imagewatcher.ImageWatcher mImageWatcher;
 
-    public FriendCircleAdapter(Context context, RecyclerView recyclerView, ImageWatcher imageWatcher) {
+    public FriendCircleAdapter(Context context, RecyclerView recyclerView, ch.ielse.view.imagewatcher.ImageWatcher imageWatcher) {
         this.mContext = context;
         this.mImageWatcher = imageWatcher;
         mRecyclerView = recyclerView;
@@ -130,33 +122,8 @@ public class FriendCircleAdapter extends RecyclerView.Adapter<FriendCircleAdapte
                 wordAndImagesViewHolder.nineGridView.setOnImageClickListener(new NineGridView.OnImageClickListener() {
                     @Override
                     public void onImageClick(int position, View view) {
-                        Rect globalVisibleRect = new  Rect();
-                        view.getGlobalVisibleRect(globalVisibleRect);
-                        System.out.println("  globalVisibleRect   " + globalVisibleRect);
 //                        mImageWatcher.show((ImageView) view, wordAndImagesViewHolder.nineGridView.getImageViews(), friendCircleBean.getImageUrls());
-                        int location[] = new int[2];
-
-                        view.getLocationOnScreen(location);
-                        System.out.println(" getLocationOnScreen  " + Arrays.toString(location));
-                        ArrayList<ContentViewOriginModel> originModels = new ArrayList<ContentViewOriginModel>();
-                        for (int i = 0; i < wordAndImagesViewHolder.nineGridView.getImageViews().size(); i++) {
-                            ContentViewOriginModel imageBean = new ContentViewOriginModel();
-                            ImageView imageView = wordAndImagesViewHolder.nineGridView.getImageViews().get(i);
-                            if (imageView == null) {
-                                imageBean.left = 0;
-                                imageBean.top = 0;
-                                imageBean.width = 0;
-                                imageBean.height = 0;
-                            } else {
-                                imageView.getLocationOnScreen(location);
-                                imageBean.left = location[0];
-                                imageBean.top = location[1] - Fucking.getFuckHeight(imageView.getContext());
-                                imageBean.width = imageView.getWidth();
-                                imageBean.height = imageView.getHeight();
-                            }
-                            originModels.add(imageBean);
-                        }
-                        ImageViewerUi2.show(view.getContext(), view, friendCircleBean.getImageUrls(), position,originModels);
+                        ImageWatcher.show((Activity) view.getContext(), wordAndImagesViewHolder.nineGridView.getImageViews(), friendCircleBean.getImageUrls(), position);
 
                     }
                 });

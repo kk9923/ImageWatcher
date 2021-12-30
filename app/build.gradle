@@ -35,7 +35,9 @@ dependencies {
     implementation 'io.reactivex.rxjava2:rxjava:2.2.8'
     implementation 'ch.ielse:imagewatcher:1.0.3'
 
-    implementation project(':ImageWatcher')
+//    implementation project(':ImageWatcher')
+
+    implementation 'com.github.kk9923:ImageWatcher:1.0.0'
 
     implementation 'com.gyf.immersionbar:immersionbar:3.0.0'
 

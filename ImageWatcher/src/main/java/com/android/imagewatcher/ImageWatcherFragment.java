@@ -81,7 +81,6 @@ public class ImageWatcherFragment extends Fragment {
             public void callFinish() {
                 FragmentActivity activity = getActivity();
                 if (activity != null && !activity.isFinishing() && !activity.isDestroyed()) {
-                    activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
                     activity.finish();
                     activity.overridePendingTransition(0, 0);
                 }

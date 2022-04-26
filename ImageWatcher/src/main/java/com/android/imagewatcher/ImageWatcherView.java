@@ -149,9 +149,9 @@ public class ImageWatcherView extends FrameLayout {
                 mTranslateX = moveX - mDownX;
                 mTranslateY = moveY - mDownY;
                 // 禁止向上滑动
-                if (mTranslateY <= 0) {
-                    break;
-                }
+//                if (mTranslateY <= 0) {
+//                    break;
+//                }
 
                 mYDistanceTraveled += Math.abs(mTranslateY);
                 mXDistanceTraveled += Math.abs(mTranslateX);
